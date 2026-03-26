@@ -185,23 +185,21 @@ def display_standard_dbg(dbg, title="Standard De Bruijn Graph"):
     edge_labels = {}
     for u, chars in dbg.edges.items():
         for char in chars:
-            # Skip sentinel/padding characters
-            if char.isdigit():
-                continue
             v = u[1:] + char
             if v in dbg.nodes:
                 G.add_edge(u, v, label=char)
                 edge_labels[(u, v)] = char
 
-    pos = nx.spring_layout(G, seed=42)
-    plt.figure(figsize=(10, 7))
+    pos = nx.kamada_kawai_layout(G, scale=2)
+    plt.figure(figsize=(14, 10))
     plt.title(title)
 
-    nx.draw_networkx_nodes(G, pos, node_size=1500, node_color='lightblue')
+    nx.draw_networkx_nodes(G, pos, node_size=2000, node_color='lightblue')
     nx.draw_networkx_labels(G, pos, font_size=9)
-    nx.draw_networkx_edges(G, pos, arrows=True, arrowsize=20,
-                           connectionstyle='arc3,rad=0.1')
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
+    nx.draw_networkx_edges(G, pos, arrows=True, arrowsize=20, min_source_margin=25,
+                           min_target_margin=25, connectionstyle='arc3,rad=0.2')
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=9,
+                                 bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.7))
 
     plt.axis('off')
     plt.tight_layout()
@@ -210,22 +208,21 @@ def display_standard_dbg(dbg, title="Standard De Bruijn Graph"):
 
 def display_succinct_dbg(sdbg, title="Succinct De Bruijn Graph (BOSS)"):
     """
-    Displays the BOSS arrays as two tables:
-      - Top:    F array (character -> first row index)
-      - Bottom: Row-indexed table of Node, W, and last
-    in the order F, last, Node, W as requested.
+    Displays the BOSS arrays as two side-by-side tables:
+      - Left:  F array (character -> first row index)
+      - Right: Row-indexed table of last, Node, W
     """
-    fig, (ax_f, ax_rows) = plt.subplots(2, 1, figsize=(8, 2 + len(sdbg.Node) * 0.4 + 2))
+    fig, (ax_f, ax_rows) = plt.subplots(1, 2, figsize=(10, 1.5 + len(sdbg.Node) * 0.4))
     fig.suptitle(title, fontsize=13, fontweight='bold')
 
-    # ── F table ──────────────────────────────────────────────────────────────
+    # ── F table (left) ───────────────────────────────────────────────────────
     ax_f.axis('off')
     f_keys = list(sdbg.F.keys())
-    f_vals = [str(sdbg.F[k]) for k in f_keys]
+    f_data = [[str(sdbg.F[k])] for k in f_keys]
     f_table = ax_f.table(
-        cellText=[f_vals],
-        colLabels=f_keys,
-        rowLabels=['F'],
+        cellText=f_data,
+        colLabels=['index'],
+        rowLabels=f_keys,
         loc='center',
         cellLoc='center',
     )
@@ -234,7 +231,7 @@ def display_succinct_dbg(sdbg, title="Succinct De Bruijn Graph (BOSS)"):
     f_table.scale(1, 1.5)
     ax_f.set_title('F', fontsize=10, pad=4)
 
-    # ── Row-indexed table (last, Node, W) ────────────────────────────────────
+    # ── Row-indexed table (right): last, Node, W ─────────────────────────────
     ax_rows.axis('off')
     n = len(sdbg.Node)
     rows_data = [[sdbg.last[i], sdbg.Node[i], sdbg.W[i]] for i in range(n)]
@@ -252,7 +249,6 @@ def display_succinct_dbg(sdbg, title="Succinct De Bruijn Graph (BOSS)"):
 
     plt.tight_layout()
     plt.show()
-
 
 # ── Memory comparison ─────────────────────────────────────────────────────────
 
@@ -278,22 +274,27 @@ if __name__ == '__main__':
     dbg = StandardDBG(k=3)
     reads = ["TACAC", "TACTC", "GACTC"]
     dbg.build_from_reads(reads)
-    # print(f"Concatenated String: {dbg.concat_string(reads)}")
+    print(f'--- Standard DBG ---')
+    print(f"Concatenated String: {dbg.concat_string(reads)}")
     print(f"List of Nodes: {dbg.nodes}")
-    print(len(dbg.nodes))
     print(f"List of Nodes and Edges: {dbg.edges}")
-    print(len(dbg.edges))
+
 
     sdbg = SuccinctDBG(dbg)
     sdbg.convert_to_boss()
-    # print(f"F array: {sdbg.F}")
-    # print(f"last array: {sdbg.last}")
-    # print(f"Node array: {sdbg.Node}")
-    # print(f"W array: {sdbg.W}")
+    print(f'--- Succinct DBG ---')
+    print(f"F array: {sdbg.F}")
+    print(f"last array: {sdbg.last}")
+    print(f"Node array: {sdbg.Node}")
+    print(f"W array: {sdbg.W}")
 
+    compare_memory(dbg, sdbg)
+
+    # --- Plotting Graphs ---
     display_standard_dbg(dbg)
     display_succinct_dbg(sdbg)
 
     #ToDO
     # figure out the order of two same Nodes (TAC, TAC)
+    # plot and compare "reduction" vs read size
   
