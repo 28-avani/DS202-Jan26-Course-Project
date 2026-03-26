@@ -23,7 +23,11 @@ class StandardDBG:
         # Adding the edge
         if u not in self.edges:
             self.edges[u] = set()
-        self.edges[u].add(new_char)       
+        self.edges[u].add(new_char) 
+
+        if v not in self.edges:
+            self.edges[v] = set()
+  
 
             
     def concat_string(self, reads):
@@ -92,11 +96,10 @@ class SuccinctDBG:
         for i in range(len(self.kp1mers)):
             self.W.append(self.kp1mers[i][-1])
             self.Node.append(self.kp1mers[i][:-1])
-            print(self.kp1mers[i])
             if (i+1) <= (len(self.kp1mers) - 1):
                 same_next = (self.kp1mers[i][:-1] == self.kp1mers[i+1][:-1])  
             else:
-                same_next = 1
+                same_next = 0
             self.last.append(0 if same_next else 1)
 
         # 4. Build F: for each character c, F[c] = first row index whose source
@@ -105,9 +108,9 @@ class SuccinctDBG:
         #    The last char of the source node of edge e is e[-2].
         self.F['$'] = 0
         for pos in range(1, len(self.kp1mers)):
-            diff_before = (self.kp1mers[i][:-2] != self.kp1mers[i-1][:-2])  
-            if diff_before and self.kp1mers[i][-2] in ("A", "C", "G", "T"):
-                self.F[self.kp1mers[i][:-2]] = pos
+            diff_before = (self.kp1mers[pos][-2] != self.kp1mers[pos-1][-2]) and (self.kp1mers[pos][-2] in ("A", "C", "G", "T")) 
+            if diff_before:
+                self.F[self.kp1mers[pos][-2]] = pos
 
     # ── Rank / Select primitives ──────────────────────────────────────────────
 
@@ -163,6 +166,92 @@ class SuccinctDBG:
                 break
         return v - prev_one
 
+# ── Graph Display ─────────────────────────────────────────────────────────────
+
+import matplotlib.pyplot as plt
+import networkx as nx
+
+def display_standard_dbg(dbg, title="Standard De Bruijn Graph"):
+    """
+    Draws the Standard DBG as a directed graph.
+    Nodes are k-mers; edges are labeled with the transition character.
+    Sentinel characters (digits) are filtered out.
+    """
+    G = nx.MultiDiGraph()
+
+    for node in dbg.nodes:
+        G.add_node(node)
+
+    edge_labels = {}
+    for u, chars in dbg.edges.items():
+        for char in chars:
+            # Skip sentinel/padding characters
+            if char.isdigit():
+                continue
+            v = u[1:] + char
+            if v in dbg.nodes:
+                G.add_edge(u, v, label=char)
+                edge_labels[(u, v)] = char
+
+    pos = nx.spring_layout(G, seed=42)
+    plt.figure(figsize=(10, 7))
+    plt.title(title)
+
+    nx.draw_networkx_nodes(G, pos, node_size=1500, node_color='lightblue')
+    nx.draw_networkx_labels(G, pos, font_size=9)
+    nx.draw_networkx_edges(G, pos, arrows=True, arrowsize=20,
+                           connectionstyle='arc3,rad=0.1')
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
+
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+
+def display_succinct_dbg(sdbg, title="Succinct De Bruijn Graph (BOSS)"):
+    """
+    Displays the BOSS arrays as two tables:
+      - Top:    F array (character -> first row index)
+      - Bottom: Row-indexed table of Node, W, and last
+    in the order F, last, Node, W as requested.
+    """
+    fig, (ax_f, ax_rows) = plt.subplots(2, 1, figsize=(8, 2 + len(sdbg.Node) * 0.4 + 2))
+    fig.suptitle(title, fontsize=13, fontweight='bold')
+
+    # ── F table ──────────────────────────────────────────────────────────────
+    ax_f.axis('off')
+    f_keys = list(sdbg.F.keys())
+    f_vals = [str(sdbg.F[k]) for k in f_keys]
+    f_table = ax_f.table(
+        cellText=[f_vals],
+        colLabels=f_keys,
+        rowLabels=['F'],
+        loc='center',
+        cellLoc='center',
+    )
+    f_table.auto_set_font_size(False)
+    f_table.set_fontsize(10)
+    f_table.scale(1, 1.5)
+    ax_f.set_title('F', fontsize=10, pad=4)
+
+    # ── Row-indexed table (last, Node, W) ────────────────────────────────────
+    ax_rows.axis('off')
+    n = len(sdbg.Node)
+    rows_data = [[sdbg.last[i], sdbg.Node[i], sdbg.W[i]] for i in range(n)]
+    row_labels = [str(i) for i in range(n)]
+    rows_table = ax_rows.table(
+        cellText=rows_data,
+        colLabels=['last', 'Node', 'W'],
+        rowLabels=row_labels,
+        loc='center',
+        cellLoc='center',
+    )
+    rows_table.auto_set_font_size(False)
+    rows_table.set_fontsize(10)
+    rows_table.scale(1, 1.5)
+
+    plt.tight_layout()
+    plt.show()
 
 
 # ── Memory comparison ─────────────────────────────────────────────────────────
@@ -172,8 +261,6 @@ import sys
 def compare_memory(standard, succinct):
     # Rough estimate — Python object overhead inflates both numbers equally
     std_size = sys.getsizeof(standard.nodes) + sys.getsizeof(standard.edges)
-    for u, mask in standard.edges.items():
-        std_size += sys.getsizeof(u) + sys.getsizeof(mask)
 
     suc_size = (sys.getsizeof(succinct.W)
                 + sys.getsizeof(succinct.last)
@@ -182,7 +269,7 @@ def compare_memory(standard, succinct):
     print(f'--- Memory Comparison ---')
     print(f'Standard DBG approx : {std_size} bytes')
     print(f'Succinct DBG approx : {suc_size} bytes')
-    print(f'Reduction           : {100 - (suc_size / std_size * 100):.2f}%')
+    print(f'Reduction : {100 - (suc_size / std_size * 100):.2f}%')
 
 
 
@@ -191,14 +278,22 @@ if __name__ == '__main__':
     dbg = StandardDBG(k=3)
     reads = ["TACAC", "TACTC", "GACTC"]
     dbg.build_from_reads(reads)
-    print(dbg.concat_string(reads))
-    print(dbg.nodes)
-    print(dbg.edges)
+    # print(f"Concatenated String: {dbg.concat_string(reads)}")
+    print(f"List of Nodes: {dbg.nodes}")
+    print(len(dbg.nodes))
+    print(f"List of Nodes and Edges: {dbg.edges}")
+    print(len(dbg.edges))
 
     sdbg = SuccinctDBG(dbg)
     sdbg.convert_to_boss()
-    print(sdbg.F)
-    print(sdbg.last)
-    print(sdbg.Node)
-    print(sdbg.W)
+    # print(f"F array: {sdbg.F}")
+    # print(f"last array: {sdbg.last}")
+    # print(f"Node array: {sdbg.Node}")
+    # print(f"W array: {sdbg.W}")
+
+    display_standard_dbg(dbg)
+    display_succinct_dbg(sdbg)
+
+    #ToDO
+    # figure out the order of two same Nodes (TAC, TAC)
   
