@@ -93,24 +93,59 @@ class SuccinctDBG:
         self.kp1mers.sort(key=lambda s: (s[:-1][::-1], s[-1]))
 
         # 3. Build W (list of tokens), Node (list of kmers) and last (list of 0/1)
-        for i in range(len(self.kp1mers)):
-            self.W.append(self.kp1mers[i][-1])
-            self.Node.append(self.kp1mers[i][:-1])
-            if (i+1) <= (len(self.kp1mers) - 1):
-                same_next = (self.kp1mers[i][:-1] == self.kp1mers[i+1][:-1])  
-            else:
-                same_next = 0
-            self.last.append(0 if same_next else 1)
+        # for i in range(len(self.kp1mers)):
+        #     self.W.append(self.kp1mers[i][-1])
+        #     self.Node.append(self.kp1mers[i][:-1])
+        #     if (i+1) <= (len(self.kp1mers) - 1):
+        #         same_next = (self.kp1mers[i][:-1] == self.kp1mers[i+1][:-1])  
+        #     else:
+        #         same_next = 0
+        #     self.last.append(0 if same_next else 1)
+        # Track labels used for the CURRENT suffix group
+        current_suffix = None
+        seen_labels_in_suffix = set()
 
-        # 4. Build F: for each character c, F[c] = first row index whose source
-        #    node ends with c.  Because edges are co-lex sorted (primary key =
-        #    last char of source node), each character's rows are contiguous.
-        #    The last char of the source node of edge e is e[-2].
-        self.F['$'] = 0
-        for pos in range(1, len(self.kp1mers)):
-            diff_before = (self.kp1mers[pos][-2] != self.kp1mers[pos-1][-2]) and (self.kp1mers[pos][-2] in ("A", "C", "G", "T")) 
-            if diff_before:
-                self.F[self.kp1mers[pos][-2]] = pos
+        for i in range(len(self.kp1mers)):
+            curr = self.kp1mers[i]
+            edge_label = curr[-1]
+            node_suffix = curr[1:-1] # The (k-1) suffix
+
+            # 2. Check if we entered a NEW suffix group
+            if node_suffix != current_suffix:
+                current_suffix = node_suffix
+                seen_labels_in_suffix = set() # Reset for the new destination node group
+
+            # 3. Redundancy Check: Have we seen this edge label for this suffix?
+            is_redundant = False
+            if edge_label in seen_labels_in_suffix:
+                is_redundant = True
+            else:
+                seen_labels_in_suffix.add(edge_label)
+
+            # 4. Store the marked/unmarked character
+            # Using lowercase 'a' as a proxy for the A- notation
+            final_w = edge_label.lower() if is_redundant else edge_label
+            
+            self.W.append(final_w)
+            self.Node.append(curr[:-1])
+
+            # 5. Build 'last' bitvector (standard BOSS logic)
+            # 1 if this is the last outgoing edge for this specific source node
+            if (i + 1) < len(self.kp1mers):
+                is_last = (curr[:-1] != self.kp1mers[i+1][:-1])
+            else:
+                is_last = True
+            self.last.append(1 if is_last else 0)
+
+            # 4. Build F: for each character c, F[c] = first row index whose source
+            #    node ends with c.  Because edges are co-lex sorted (primary key =
+            #    last char of source node), each character's rows are contiguous.
+            #    The last char of the source node of edge e is e[-2].
+            self.F['$'] = 0
+            for pos in range(1, len(self.kp1mers)):
+                diff_before = (self.kp1mers[pos][-2] != self.kp1mers[pos-1][-2]) and (self.kp1mers[pos][-2] in ("A", "C", "G", "T")) 
+                if diff_before:
+                    self.F[self.kp1mers[pos][-2]] = pos
 
     # ── Rank / Select primitives ──────────────────────────────────────────────
 
@@ -203,6 +238,7 @@ def display_standard_dbg(dbg, title="Standard De Bruijn Graph"):
 
     plt.axis('off')
     plt.tight_layout()
+    plt.savefig('Standard_DBG_graph.png') 
     plt.show()
 
 
@@ -248,6 +284,7 @@ def display_succinct_dbg(sdbg, title="Succinct De Bruijn Graph (BOSS)"):
     rows_table.scale(1, 1.5)
 
     plt.tight_layout()
+    plt.savefig('Succinct_DBG_table.png')
     plt.show()
 
 # ── Memory comparison ─────────────────────────────────────────────────────────
@@ -295,6 +332,5 @@ if __name__ == '__main__':
     display_succinct_dbg(sdbg)
 
     #ToDO
-    # figure out the order of two same Nodes (TAC, TAC)
     # plot and compare "reduction" vs read size
   
