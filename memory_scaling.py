@@ -93,15 +93,6 @@ class SuccinctDBG:
         self.kp1mers.sort(key=lambda s: (s[:-1][::-1], s[-1]))
 
         # 3. Build W (list of tokens), Node (list of kmers) and last (list of 0/1)
-        # for i in range(len(self.kp1mers)):
-        #     self.W.append(self.kp1mers[i][-1])
-        #     self.Node.append(self.kp1mers[i][:-1])
-        #     if (i+1) <= (len(self.kp1mers) - 1):
-        #         same_next = (self.kp1mers[i][:-1] == self.kp1mers[i+1][:-1])  
-        #     else:
-        #         same_next = 0
-        #     self.last.append(0 if same_next else 1)
-        # Track labels used for the CURRENT suffix group
         current_suffix = None
         seen_labels_in_suffix = set()
 
@@ -147,59 +138,60 @@ class SuccinctDBG:
                 if diff_before:
                     self.F[self.kp1mers[pos][-2]] = pos
 
-    # ── Rank / Select primitives ──────────────────────────────────────────────
+    # I have not implemented the rank/select functions. 
+    # # ── Rank / Select primitives ──────────────────────────────────────────────
 
-    def rank(self, structure, char, idx):
-        """Count of `char` in structure[0..idx] (inclusive)."""
-        return structure[:idx + 1].count(char)
+    # def rank(self, structure, char, idx):
+    #     """Count of `char` in structure[0..idx] (inclusive)."""
+    #     return structure[:idx + 1].count(char)
 
-    def select(self, structure, char, count):
-        """Index of the count-th occurrence of `char` in structure (1-based count)."""
-        found = 0
-        for i, val in enumerate(structure):
-            if val == char:
-                found += 1
-                if found == count:
-                    return i
-        return -1   # not found
+    # def select(self, structure, char, count):
+    #     """Index of the count-th occurrence of `char` in structure (1-based count)."""
+    #     found = 0
+    #     for i, val in enumerate(structure):
+    #         if val == char:
+    #             found += 1
+    #             if found == count:
+    #                 return i
+    #     return -1   # not found
 
-    # ── BOSS navigation ───────────────────────────────────────────────────────
+    # # ── BOSS navigation ───────────────────────────────────────────────────────
 
-    def get_node_last_char(self, i):
-        """
-        Last character of the k-mer at row i, determined by which F-group row i
-        falls into. Checks in reverse alphabet order (largest F value first) to
-        find the largest F[char] ≤ i.
-        """
-        for char in reversed(self.alphabet):
-            f = self.F.get(char)
-            if f is not None and f != len(self.last) and i >= f:
-                return char
-        return None
+    # def get_node_last_char(self, i):
+    #     """
+    #     Last character of the k-mer at row i, determined by which F-group row i
+    #     falls into. Checks in reverse alphabet order (largest F value first) to
+    #     find the largest F[char] ≤ i.
+    #     """
+    #     for char in reversed(self.alphabet):
+    #         f = self.F.get(char)
+    #         if f is not None and f != len(self.last) and i >= f:
+    #             return char
+    #     return None
 
-    def bwd(self, i):
-        """Edge index j such that edge j points INTO node i. [paper eq. 213-214]"""
-        char = self.get_node_last_char(i)
-        if char is None:
-            return -1
-        r = self.rank(self.last, 1, i) - self.rank(self.last, 1, self.F[char])
-        return self.select(self.W, char, r)
+    # def bwd(self, i):
+    #     """Edge index j such that edge j points INTO node i. [paper eq. 213-214]"""
+    #     char = self.get_node_last_char(i)
+    #     if char is None:
+    #         return -1
+    #     r = self.rank(self.last, 1, i) - self.rank(self.last, 1, self.F[char])
+    #     return self.select(self.W, char, r)
 
-    def fwd(self, j):
-        """Node index i that edge j points TO. [paper eq. 214]"""
-        char        = self.W[j]
-        r           = self.rank(self.W, char, j)
-        target_rank = self.rank(self.last, 1, self.F[char]) + r
-        return self.select(self.last, 1, target_rank)
+    # def fwd(self, j):
+    #     """Node index i that edge j points TO. [paper eq. 214]"""
+    #     char        = self.W[j]
+    #     r           = self.rank(self.W, char, j)
+    #     target_rank = self.rank(self.last, 1, self.F[char]) + r
+    #     return self.select(self.last, 1, target_rank)
 
-    def out_degree(self, v):
-        """Number of outgoing edges from node v. [paper Sec. 3.2]"""
-        prev_one = -1
-        for i in range(v - 1, -1, -1):
-            if self.last[i] == 1:
-                prev_one = i
-                break
-        return v - prev_one
+    # def out_degree(self, v):
+    #     """Number of outgoing edges from node v. [paper Sec. 3.2]"""
+    #     prev_one = -1
+    #     for i in range(v - 1, -1, -1):
+    #         if self.last[i] == 1:
+    #             prev_one = i
+    #             break
+    #     return v - prev_one
 
 # ── Graph Display ─────────────────────────────────────────────────────────────
 
@@ -304,12 +296,32 @@ def compare_memory(standard, succinct):
     print(f'Succinct DBG approx : {suc_size} bytes')
     print(f'Reduction : {100 - (suc_size / std_size * 100):.2f}%')
 
+def research_memory_estimate(standard, succinct):
+    m = len(succinct.W)  # Number of edges
+    sigma = 4            # For DNA: A, C, G, T
+    k = standard.k
+    
+    # Standard DBG theoretical: 
+    # Nodes * k (chars) + Edges * (k + 1)
+    std_bits = (len(standard.nodes) * k * 8) + (m * 8) 
+
+    # Succinct BOSS theoretical:
+    # W array: m * log2(sigma) bits
+    # last array: m bits
+    # F array: negligible for large m
+    suc_bits = (m * 2) + (m * 1) 
+    
+    print(f"Theoretical Standard: {std_bits / 8:.2f} bytes")
+    print(f"Theoretical Succinct: {suc_bits / 8:.2f} bytes")
+    print(f"Theoretical Reduction: {100 - (suc_bits / std_bits * 100):.2f}%")
+
 
 
 # --- Execution ---
 if __name__ == '__main__':
     dbg = StandardDBG(k=3)
-    reads = ["TACAC", "TACTC", "GACTC"]
+    # reads = ["TACAC", "TACTC", "GACTC"]
+    reads = ["GTCCCC", "CCATCG", "ATCGAAC"]
     dbg.build_from_reads(reads)
     print(f'--- Standard DBG ---')
     print(f"Concatenated String: {dbg.concat_string(reads)}")
@@ -332,5 +344,5 @@ if __name__ == '__main__':
     display_succinct_dbg(sdbg)
 
     #ToDO
-    # plot and compare "reduction" vs read size
+    # plot and compare memory vs read size/read length
   

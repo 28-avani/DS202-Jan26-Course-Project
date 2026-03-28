@@ -11,26 +11,26 @@
 #define MAX_READ_LEN 1024
 
 // Input Genomes
-const char* FASTA_FILES[MAX_SEQS] = {"S_aureus.fasta", "L_acidophilus.fasta", "P_aeruginosa.fasta", "M_tuberculosis.fasta"}; // Add more FASTA files as needed
-int NUM_FILES = 4;
+const char* FASTA_FILES[MAX_SEQS] = {"S_aureus.fasta"}; // Add more FASTA files as needed
+int NUM_FILES = 1;
 
 // Output FASTQ File (Standard MEGAHIT Input)
-const char* OUTPUT_FILE = "mock_metagenome.fq";
+const char* OUTPUT_FILE = "mock_metagenome_exp1.fq";
 
 // Read Ratios (The "Uneven Depth" Trigger)
 // E.g., S. aureus is highly abundant (500,000 reads), L. acidophilus is rare (5,000 reads)
 // Array order: [P_aeruginosa, M_tuberculosis, S_aureus, L_acidophilus]
 // This gives every genome roughly ~2.5x coverage.
-int NUM_READS[4] = {350000, 15000, 400000, 200000};
+int NUM_READS[1] = {350000};
 
 // Illumina Sequencing Characteristics
 double MEAN_READ_LEN = 150.0;
-double STD_DEV_LEN = 15.0;
+double STD_DEV_LEN = 0.0;
 
 // Noise Parameters (Toggle ERROR_MODE to 0 for perfect reads, 1 for realistic)
-int ERROR_MODE = 1; 
-double CHIMERA_RATE = 0.02;    // 2% chance of fusing two random sequences
-double ERROR_RATE = 0.01;      // 1% substitution sequencing error rate
+int ERROR_MODE = 0; 
+double CHIMERA_RATE = 0.00;    // 0% chance of fusing two random sequences
+double ERROR_RATE = 0.00;      // 0% substitution sequencing error rate
 // ============================================================================
 
 typedef struct {

@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/LENOVO/Documents/Code/DS202-Jan26-Course-Project/make_reads_ablation'
+relocations:     []
+...
