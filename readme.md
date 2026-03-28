@@ -37,6 +37,62 @@ In addition to the component-wise analysis detailed in Table 1 Rows 1-4, Experim
 
 ![](/images/experiments.png)
 
+# 5 Results
+
+## Experiment 1: Memory Scaling
+
+This experiment measures and compares the memory usage of a Standard de Bruijn Graph (DBG) and a Succinct DBG (BOSS representation) as a function of read count and read length, for both random and biological input data.
+
+### Prerequisites
+
+Install dependencies into the virtual environment:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Step 1 — Generate the random genome
+
+```bash
+python build_random_genome.py
+```
+
+Constructs a 1,993,560 bp random ACGT genome (matching the *L. acidophilus* genome length) and writes it to `random_genome.fasta`.
+
+### Step 2 — Generate simulated reads from the random genome
+
+```bash
+python make_random_reads.py
+```
+
+Samples 20,000 reads of 1,000 bp from `random_genome.fasta` using the same random-substring strategy as `make_reads_ablation.c`. Writes output to `mock_random_exp1.fq`.
+
+Optional flags:
+```bash
+python make_random_reads.py --num-reads 20000 --read-length 1000 --seed 42
+```
+
+### Step 3 — Generate biological reads
+
+Compile and run `make_reads_ablation_exp1.c` to produce `mock_metagenome_exp1.fq` from the *L. acidophilus* genome:
+
+```bash
+gcc -O2 -o make_reads_ablation make_reads_ablation_exp1.c -lm
+./make_reads_ablation
+```
+
+### Step 4 — Run the memory scaling benchmark and plot
+
+```bash
+python memory_scaling_plots.py
+```
+
+Produces a two-panel figure:
+- **Left:** Memory usage vs. number of reads (2 – 1,000), at a fixed read length of 150 bp
+- **Right:** Memory usage vs. read length (20 – 1,000 bp), at a fixed read count of 1,000
+
+Each panel overlays four series: Standard DBG and Succinct DBG for both random and biological data.
+
 # References
 (1) A. Bowe, T. Onodera, K. Sadakane, and T. Shibuya. 2012. Succinct de Bruijn Graphs. Raphael, B., Tang, J. (eds) Algorithms in Bioinformatics. WABI 2012. Lecture Notes in Computer Science(), vol 7534. Springer, Berlin, Heidelberg (2012). doi:10.1007/978-3-642-33122-0_18
 
