@@ -331,6 +331,4 @@ if __name__ == '__main__':
     display_standard_dbg(dbg)
     display_succinct_dbg(sdbg)
 
-    #ToDO
-    # plot and compare "reduction" vs read size
   
